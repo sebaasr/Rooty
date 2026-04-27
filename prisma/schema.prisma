@@ -1,0 +1,227 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─── Enums ───────────────────────────────────────────────────────────────────
+
+enum Role {
+  STUDENT
+  TUTOR
+  DIRECTOR
+  PROVOST
+}
+
+enum TutorStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  SUSPENDED
+}
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED_BY_STUDENT
+  CANCELLED_BY_TUTOR
+  COMPLETED
+  NO_SHOW
+}
+
+enum SessionMode {
+  IN_PERSON
+  ONLINE
+}
+
+enum PayPeriodStatus {
+  OPEN
+  PENDING_APPROVAL
+  APPROVED
+  EXPORTED
+  PAID
+}
+
+enum PayoutStatus {
+  PENDING
+  APPROVED
+  EXPORTED
+  PAID
+}
+
+// ─── Models ──────────────────────────────────────────────────────────────────
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String
+  avatarUrl String?
+  role      Role     @default(STUDENT)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tutorProfile TutorProfile?
+  bookings     Booking[]     @relation("StudentBookings")
+  reviews      Review[]      @relation("StudentReviews")
+}
+
+model TutorProfile {
+  id              String      @id @default(cuid())
+  userId          String      @unique
+  user            User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  bio             String?
+  photoUrl        String?
+  status          TutorStatus @default(PENDING)
+  hourlyRate      Decimal     @default(0) @db.Decimal(10, 2)
+  weeklyHourCap   Int         @default(20)
+  stripeAccountId String?
+  stripeOnboarded Boolean     @default(false)
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  subjects     TutorSubject[]
+  availability AvailabilitySlot[]
+  bookings     Booking[]          @relation("TutorBookings")
+  sessions     Session[]
+  payouts      Payout[]
+  reviews      Review[]           @relation("TutorReviews")
+}
+
+model Subject {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  code      String?
+  category  String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  tutors   TutorSubject[]
+  bookings Booking[]
+}
+
+model TutorSubject {
+  tutorId   String
+  subjectId String
+  tutor     TutorProfile @relation(fields: [tutorId], references: [id], onDelete: Cascade)
+  subject   Subject      @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+
+  @@id([tutorId, subjectId])
+}
+
+model AvailabilitySlot {
+  id           String       @id @default(cuid())
+  tutorId      String
+  tutor        TutorProfile @relation(fields: [tutorId], references: [id], onDelete: Cascade)
+  dayOfWeek    Int
+  startTime    String
+  endTime      String
+  isRecurring  Boolean      @default(true)
+  specificDate DateTime?
+  isBlocked    Boolean      @default(false)
+  createdAt    DateTime     @default(now())
+
+  @@index([tutorId])
+}
+
+model Booking {
+  id           String        @id @default(cuid())
+  studentId    String
+  student      User          @relation("StudentBookings", fields: [studentId], references: [id])
+  tutorId      String
+  tutor        TutorProfile  @relation("TutorBookings", fields: [tutorId], references: [id])
+  subjectId    String
+  subject      Subject       @relation(fields: [subjectId], references: [id])
+  scheduledAt  DateTime
+  durationMin  Int           @default(60)
+  mode         SessionMode   @default(IN_PERSON)
+  location     String?
+  status       BookingStatus @default(PENDING)
+  cancelReason String?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  session Session?
+
+  @@index([studentId])
+  @@index([tutorId])
+  @@index([scheduledAt])
+}
+
+model Session {
+  id           String       @id @default(cuid())
+  bookingId    String       @unique
+  booking      Booking      @relation(fields: [bookingId], references: [id])
+  tutorId      String
+  tutor        TutorProfile @relation(fields: [tutorId], references: [id])
+  checkedInAt  DateTime?
+  checkedOutAt DateTime?
+  durationMin  Int?
+  notes        String?
+  isNoShow     Boolean      @default(false)
+  payoutId     String?
+  payout       Payout?      @relation(fields: [payoutId], references: [id])
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  review Review?
+}
+
+model Review {
+  id        String       @id @default(cuid())
+  sessionId String       @unique
+  session   Session      @relation(fields: [sessionId], references: [id])
+  studentId String
+  student   User         @relation("StudentReviews", fields: [studentId], references: [id])
+  tutorId   String
+  tutor     TutorProfile @relation("TutorReviews", fields: [tutorId], references: [id])
+  rating    Int
+  comment   String?
+  createdAt DateTime     @default(now())
+
+  @@index([tutorId])
+}
+
+model PayPeriod {
+  id        String          @id @default(cuid())
+  startDate DateTime
+  endDate   DateTime
+  status    PayPeriodStatus @default(OPEN)
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+
+  payouts Payout[]
+}
+
+model Payout {
+  id             String       @id @default(cuid())
+  tutorId        String
+  tutor          TutorProfile @relation(fields: [tutorId], references: [id])
+  payPeriodId    String
+  payPeriod      PayPeriod    @relation(fields: [payPeriodId], references: [id])
+  hoursWorked    Decimal      @db.Decimal(10, 2)
+  hourlyRate     Decimal      @db.Decimal(10, 2)
+  totalOwed      Decimal      @db.Decimal(10, 2)
+  status         PayoutStatus @default(PENDING)
+  stripePayoutId String?
+  approvedBy     String?
+  approvedAt     DateTime?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  sessions Session[]
+
+  @@index([tutorId])
+  @@index([payPeriodId])
+}
+
+// Stores configurable values like hourlyRate default, weeklyHourCap default, etc.
+model AdminConfig {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  value     String
+  updatedBy String
+  updatedAt DateTime @updatedAt
+}
