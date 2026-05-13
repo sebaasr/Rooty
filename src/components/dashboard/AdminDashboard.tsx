@@ -5,7 +5,7 @@ import { RootyWordmark } from "@/components/ui/BanyanLogo"
 import { Icon } from "@/components/ui/Icon"
 import { Avatar, Pill, Badge, Btn, Card, StatCard, SectionHeader } from "@/components/ui/index"
 import { BarChart } from "@/components/ui/charts"
-import { TUTORS, PENDING_TUTORS, SESSIONS, ADMIN_STATS, WEEKLY_DATA, SUBJECT_DATA, BUDGET_DATA, HIRING_PIPELINE, TUTOR_REQUIREMENTS, SESSION_POLICY } from "@/lib/data"
+import { TUTORS, PENDING_TUTORS, SESSIONS, ADMIN_STATS, WEEKLY_DATA, SUBJECT_DATA, BUDGET_DATA, HIRING_PIPELINE, TUTOR_REQUIREMENTS, SESSION_POLICY, LIMITS_CONFIG, PENDING_REQUESTS, TUTOR_NOSHOWS, STUDENT_NOSHOWS, LOCATION_STATS, CHATBOT_STATS, DEMAND_BY_PERIOD, ANONYMOUS_FEEDBACK } from "@/lib/data"
 
 type PendingTutor = typeof PENDING_TUTORS[0]
 
@@ -28,15 +28,20 @@ export default function AdminDashboard() {
   const [studentLimit, setStudentLimit] = useState(SESSION_POLICY.studentWeeklySessionLimit)
   const [tutorLimit, setTutorLimit]     = useState(SESSION_POLICY.tutorWeeklySessionLimit)
 
+  const overdueCount = PENDING_REQUESTS.filter(r => r.hoursAgo >= 24).length + TUTOR_NOSHOWS.length
+
   const navItems = [
-    { key:"dashboard", icon:"chart",        label:"Dashboard"                   },
-    { key:"approvals", icon:"check-circle", label:`Approvals (${pendingList.length})` },
-    { key:"tutors",    icon:"users",         label:"Tutors"                      },
-    { key:"sessions",  icon:"calendar",      label:"Sessions"                    },
-    { key:"budget",    icon:"dollar",        label:"Budget"                      },
-    { key:"hiring",    icon:"briefcase",     label:"Hiring"                      },
-    { key:"reports",   icon:"folder",        label:"Reports"                     },
-    { key:"privacy",   icon:"lock",          label:"Privacy & Data"              },
+    { key:"dashboard",      icon:"chart",        label:"Dashboard"                               },
+    { key:"approvals",      icon:"check-circle", label:`Approvals (${pendingList.length})`       },
+    { key:"tutors",         icon:"users",        label:"Tutors"                                  },
+    { key:"sessions",       icon:"calendar",     label:"Sessions"                                },
+    { key:"accountability", icon:"warning",      label:overdueCount > 0 ? `Accountability (${overdueCount})` : "Accountability" },
+    { key:"insights",       icon:"trending-up",  label:"Insights"                                },
+    { key:"budget",         icon:"dollar",       label:"Budget"                                  },
+    { key:"hiring",         icon:"briefcase",    label:"Hiring"                                  },
+    { key:"reports",        icon:"folder",       label:"Reports"                                 },
+    { key:"privacy",        icon:"lock",         label:"Privacy & Data"                          },
+    { key:"settings",       icon:"sliders",      label:"Settings"                                },
   ]
 
   function showToast(msg: string, color = "green") {
@@ -273,7 +278,7 @@ export default function AdminDashboard() {
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
             <thead>
               <tr style={{ borderBottom: "2px solid #EEF1F8", background: "var(--bg)" }}>
-                {["Tutor","Subjects","Rating","Hours / Cap","Sessions/wk","Status","Actions"].map(h => (
+                {["Tutor","Subjects","Rating","Hours / Cap","Sessions/wk","CRLA","Status","Actions"].map(h => (
                   <th key={h} style={{ padding: "12px 16px", textAlign: "left", color: "var(--muted)", fontWeight: 600, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.5px" }}>{h}</th>
                 ))}
               </tr>
@@ -310,6 +315,12 @@ export default function AdminDashboard() {
                     </td>
                     <td style={{ padding: "12px 16px" }}>
                       <Badge label={`${t.weeklySessionsUsed}/${tutorLimit}`} color={sessAtLimit ? "red" : t.weeklySessionsUsed >= tutorLimit - 1 ? "gold" : "green"} />
+                    </td>
+                    <td style={{ padding: "12px 16px" }}>
+                      <Badge
+                        label={t.crla}
+                        color={t.crla === "Level II" ? "green" : t.crla === "Level I" ? "blue" : t.crla === "In Progress" ? "gold" : "gray"}
+                      />
                     </td>
                     <td style={{ padding: "12px 16px" }}><Badge label="Active" color="green" /></td>
                     <td style={{ padding: "12px 16px" }}>
@@ -788,15 +799,485 @@ export default function AdminDashboard() {
     )
   }
 
+  // ── ACCOUNTABILITY ───────────────────────────────────────
+  function AccountabilityScreen() {
+    const [dismissedReqs, setDismissedReqs]       = useState<number[]>([])
+    const [dismissedTutorNS, setDismissedTutorNS] = useState<number[]>([])
+    const [dismissedStudNS, setDismissedStudNS]   = useState<number[]>([])
+
+    const activeReqs      = PENDING_REQUESTS.filter(r  => !dismissedReqs.includes(r.id))
+    const overdue         = activeReqs.filter(r => r.hoursAgo >= 24)
+    const pending         = activeReqs.filter(r => r.hoursAgo < 24)
+    const activeTutorNS   = TUTOR_NOSHOWS.filter(n  => !dismissedTutorNS.includes(n.id))
+    const activeStudentNS = STUDENT_NOSHOWS.filter(n => !dismissedStudNS.includes(n.id))
+    const totalFlags      = overdue.length + activeTutorNS.length
+
+    return (
+      <div style={{ flex: 1, overflowY: "auto", padding: "28px 32px" }}>
+        <h1 style={{ fontFamily: "Lora, serif", fontWeight: 700, fontSize: 26, color: "var(--text)", margin: 0, marginBottom: 6 }}>Accountability Tracking</h1>
+        <div style={{ fontSize: 13, color: "var(--muted)", marginBottom: 24 }}>Monitor response times, no-shows, and SLA compliance</div>
+
+        {totalFlags > 0 && (
+          <div style={{ padding: "12px 16px", borderRadius: 10, background: "#FEF2F2", border: "1.5px solid #FCA5A5", marginBottom: 24, display: "flex", gap: 10, alignItems: "center", fontSize: 13, color: "#991B1B", fontWeight: 500 }}>
+            <Icon name="warning" size={16} color="#991B1B" />
+            {totalFlags} item{totalFlags !== 1 ? "s" : ""} require attention — {overdue.length} overdue response{overdue.length !== 1 ? "s" : ""}, {activeTutorNS.length} tutor no-show{activeTutorNS.length !== 1 ? "s" : ""}
+          </div>
+        )}
+
+        {/* 24-hour response SLA */}
+        <Card style={{ padding: "24px", marginBottom: 24 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 16 }}>
+            <div>
+              <div style={{ fontFamily: "Lora, serif", fontWeight: 700, fontSize: 18, color: "var(--text)" }}>Tutor Response Tracking</div>
+              <div style={{ fontSize: 13, color: "var(--muted)", marginTop: 2 }}>Tutors must accept or decline booking requests within 24 hours</div>
+            </div>
+            <div style={{ display: "flex", gap: 8 }}>
+              {overdue.length > 0 && <Badge label={`${overdue.length} OVERDUE`} color="red" />}
+              {pending.length > 0 && <Badge label={`${pending.length} pending`} color="gold" />}
+            </div>
+          </div>
+          {activeReqs.length === 0
+            ? <div style={{ padding: "24px", textAlign: "center", color: "var(--muted)", fontSize: 13 }}>✓ All requests responded to within 24 hours</div>
+            : (
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                <thead>
+                  <tr style={{ borderBottom: "2px solid #EEF1F8", background: "var(--bg)" }}>
+                    {["Student","Subject","Assigned Tutor","Requested","Elapsed","Status","Actions"].map(h => (
+                      <th key={h} style={{ padding: "10px 14px", textAlign: "left", color: "var(--muted)", fontWeight: 600, fontSize: 11, textTransform: "uppercase" as const, letterSpacing: "0.5px" }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {activeReqs.map(r => {
+                    const isOverdue = r.hoursAgo >= 24
+                    return (
+                      <tr key={r.id} style={{ borderBottom: "1px solid #F5F6FA", background: isOverdue ? "#FFF5F5" : "transparent" }}>
+                        <td style={{ padding: "11px 14px" }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                            <Avatar initials={r.studentAvatar} size={28} bg="var(--blue)" />
+                            <span style={{ fontWeight: 600 }}>{r.student}</span>
+                          </div>
+                        </td>
+                        <td style={{ padding: "11px 14px" }}><Pill label={r.subject} size="sm" /></td>
+                        <td style={{ padding: "11px 14px" }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                            <Avatar initials={r.tutorAvatar} size={28} bg="rgba(0,48,135,0.35)" />
+                            <span style={{ color: "var(--muted)" }}>{r.tutor}</span>
+                          </div>
+                        </td>
+                        <td style={{ padding: "11px 14px", color: "var(--muted)", fontSize: 12 }}>{r.requestedAt}</td>
+                        <td style={{ padding: "11px 14px" }}>
+                          <span style={{ fontWeight: 700, color: isOverdue ? "#DC2626" : "#92660A" }}>{r.hoursAgo}h ago</span>
+                        </td>
+                        <td style={{ padding: "11px 14px" }}>
+                          <Badge label={isOverdue ? "OVERDUE" : "Pending"} color={isOverdue ? "red" : "gold"} />
+                        </td>
+                        <td style={{ padding: "11px 14px" }}>
+                          <div style={{ display: "flex", gap: 6 }}>
+                            <Btn size="sm" variant="outline" onClick={() => showToast(`Reminder sent to ${r.tutor} ✓`)}>Notify Tutor</Btn>
+                            <Btn size="sm" variant="ghost" onClick={() => setDismissedReqs(d => [...d, r.id])}>Dismiss</Btn>
+                          </div>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            )
+          }
+          <div style={{ marginTop: 14, padding: "10px 14px", borderRadius: 8, background: "var(--bg)", fontSize: 12, color: "var(--muted)" }}>
+            <strong>Policy:</strong> If a tutor does not respond within 24 hours, the request is flagged here and can be manually reassigned. Repeated non-responses trigger a performance review.
+          </div>
+        </Card>
+
+        {/* Tutor no-shows */}
+        <Card style={{ padding: "24px", marginBottom: 24 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 16 }}>
+            <div>
+              <div style={{ fontFamily: "Lora, serif", fontWeight: 700, fontSize: 18, color: "var(--text)" }}>Tutor No-Shows</div>
+              <div style={{ fontSize: 13, color: "var(--muted)", marginTop: 2 }}>Tutors who missed a confirmed session without prior notice</div>
+            </div>
+            {activeTutorNS.length > 0 && <Badge label={`${activeTutorNS.length} recorded`} color="red" />}
+          </div>
+          {activeTutorNS.length === 0
+            ? <div style={{ padding: "24px", textAlign: "center", color: "var(--muted)", fontSize: 13 }}>✓ No tutor no-shows this period</div>
+            : (
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                <thead>
+                  <tr style={{ borderBottom: "2px solid #EEF1F8", background: "var(--bg)" }}>
+                    {["Tutor","Student Affected","Subject","Date & Time","Total No-Shows","Actions"].map(h => (
+                      <th key={h} style={{ padding: "10px 14px", textAlign: "left", color: "var(--muted)", fontWeight: 600, fontSize: 11, textTransform: "uppercase" as const, letterSpacing: "0.5px" }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {activeTutorNS.map(ns => (
+                    <tr key={ns.id} style={{ borderBottom: "1px solid #F5F6FA" }}>
+                      <td style={{ padding: "11px 14px" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                          <Avatar initials={ns.tutorAvatar} size={28} bg="var(--blue)" />
+                          <span style={{ fontWeight: 600 }}>{ns.tutor}</span>
+                        </div>
+                      </td>
+                      <td style={{ padding: "11px 14px", color: "var(--muted)" }}>{ns.student}</td>
+                      <td style={{ padding: "11px 14px" }}><Pill label={ns.subject} size="sm" /></td>
+                      <td style={{ padding: "11px 14px", color: "var(--muted)", fontSize: 12 }}>{ns.date} · {ns.time}</td>
+                      <td style={{ padding: "11px 14px" }}>
+                        <Badge label={`${ns.totalNoShows} total`} color={ns.totalNoShows >= 2 ? "red" : "gold"} />
+                      </td>
+                      <td style={{ padding: "11px 14px" }}>
+                        <div style={{ display: "flex", gap: 6 }}>
+                          <Btn size="sm" variant="outline" onClick={() => showToast(`Warning sent to ${ns.tutor} ✓`)}>Send Warning</Btn>
+                          <Btn size="sm" variant="ghost" onClick={() => setDismissedTutorNS(d => [...d, ns.id])}>Dismiss</Btn>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )
+          }
+        </Card>
+
+        {/* Student no-shows */}
+        <Card style={{ padding: "24px" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 16 }}>
+            <div>
+              <div style={{ fontFamily: "Lora, serif", fontWeight: 700, fontSize: 18, color: "var(--text)" }}>Student No-Shows</div>
+              <div style={{ fontSize: 13, color: "var(--muted)", marginTop: 2 }}>Students who missed a booked session without canceling in time</div>
+            </div>
+            {activeStudentNS.length > 0 && <Badge label={`${activeStudentNS.length} recorded`} color="gold" />}
+          </div>
+          {activeStudentNS.length === 0
+            ? <div style={{ padding: "24px", textAlign: "center", color: "var(--muted)", fontSize: 13 }}>✓ No student no-shows this period</div>
+            : (
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                <thead>
+                  <tr style={{ borderBottom: "2px solid #EEF1F8", background: "var(--bg)" }}>
+                    {["Student","Tutor","Subject","Date & Time","No-Shows","Actions"].map(h => (
+                      <th key={h} style={{ padding: "10px 14px", textAlign: "left", color: "var(--muted)", fontWeight: 600, fontSize: 11, textTransform: "uppercase" as const, letterSpacing: "0.5px" }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {activeStudentNS.map(ns => (
+                    <tr key={ns.id} style={{ borderBottom: "1px solid #F5F6FA" }}>
+                      <td style={{ padding: "11px 14px" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                          <Avatar initials={ns.studentAvatar} size={28} bg="var(--gold)" />
+                          <span style={{ fontWeight: 600 }}>{ns.student}</span>
+                        </div>
+                      </td>
+                      <td style={{ padding: "11px 14px", color: "var(--muted)" }}>{ns.tutor}</td>
+                      <td style={{ padding: "11px 14px" }}><Pill label={ns.subject} size="sm" /></td>
+                      <td style={{ padding: "11px 14px", color: "var(--muted)", fontSize: 12 }}>{ns.date} · {ns.time}</td>
+                      <td style={{ padding: "11px 14px" }}>
+                        <Badge label={`${ns.totalNoShows}×`} color={ns.totalNoShows >= 2 ? "red" : "gold"} />
+                      </td>
+                      <td style={{ padding: "11px 14px" }}>
+                        <div style={{ display: "flex", gap: 6 }}>
+                          <Btn size="sm" variant="outline" onClick={() => showToast(`Reminder sent to ${ns.student} ✓`)}>Send Reminder</Btn>
+                          <Btn size="sm" variant="ghost" onClick={() => setDismissedStudNS(d => [...d, ns.id])}>Dismiss</Btn>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )
+          }
+          <div style={{ marginTop: 14, padding: "10px 14px", borderRadius: 8, background: "var(--bg)", fontSize: 12, color: "var(--muted)" }}>
+            <strong>Policy:</strong> Students with 3+ no-shows in a semester may have booking privileges suspended pending a meeting with the Director. Cancellations made more than {LIMITS_CONFIG.cancellationHours}h in advance are not counted as no-shows.
+          </div>
+        </Card>
+      </div>
+    )
+  }
+
+  // ── INSIGHTS ─────────────────────────────────────────────
+  function InsightsScreen() {
+    const [period, setPeriod] = useState<"week" | "month" | "semester" | "year">("month")
+    const demandData = DEMAND_BY_PERIOD[period]
+    const maxSessions = demandData[0].sessions
+
+    const inPersonSessions = LOCATION_STATS.filter(l => l.mode === "In-Person").reduce((s, l) => s + l.sessions, 0)
+    const onlineSessions   = LOCATION_STATS.find(l => l.mode === "Online")?.sessions ?? 0
+    const totalSessions    = inPersonSessions + onlineSessions
+    const inPersonPct      = Math.round((inPersonSessions / totalSessions) * 100)
+    const onlinePct        = 100 - inPersonPct
+
+    const topByDemand = [...TUTORS].sort((a, b) => b.weeklySessionsUsed - a.weeklySessionsUsed)
+    const topByRating = [...TUTORS].sort((a, b) => b.rating - a.rating)
+
+    const periodLabel: Record<string, string> = { week:"This Week", month:"This Month", semester:"This Semester", year:"This Year" }
+
+    return (
+      <div style={{ flex: 1, overflowY: "auto", padding: "28px 32px" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 28 }}>
+          <div>
+            <h1 style={{ fontFamily: "Lora, serif", fontWeight: 700, fontSize: 26, color: "var(--text)", margin: 0 }}>Program Insights</h1>
+            <div style={{ fontSize: 13, color: "var(--muted)", marginTop: 2 }}>Demand trends, tutor performance, and platform usage</div>
+          </div>
+          <div style={{ display: "flex", gap: 6 }}>
+            {(["week","month","semester","year"] as const).map(p => (
+              <button key={p} onClick={() => setPeriod(p)} style={{
+                padding: "7px 14px", borderRadius: 8, cursor: "pointer", textTransform: "capitalize",
+                fontFamily: "DM Sans, sans-serif", fontWeight: 600, fontSize: 12,
+                background: period === p ? "var(--blue)" : "white",
+                color: period === p ? "white" : "var(--muted)",
+                border: `1.5px solid ${period === p ? "var(--blue)" : "#E0E4EF"}`,
+              }}>{p}</button>
+            ))}
+          </div>
+        </div>
+
+        {/* Subject demand + mode split */}
+        <div style={{ display: "grid", gridTemplateColumns: "3fr 2fr", gap: 20, marginBottom: 24 }}>
+          <Card style={{ padding: "24px" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+              <div style={{ fontFamily: "Lora, serif", fontWeight: 700, fontSize: 16, color: "var(--text)" }}>Most In-Demand Subjects</div>
+              <Badge label={periodLabel[period]} color="blue" />
+            </div>
+            {demandData.map((d, i) => (
+              <div key={d.subject} style={{ marginBottom: 12 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, marginBottom: 4 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <span style={{ fontFamily: "Lora, serif", fontWeight: 700, fontSize: 11, color: "var(--muted)", width: 18 }}>#{i+1}</span>
+                    <span style={{ fontWeight: 500, color: "var(--text)" }}>{d.subject}</span>
+                  </div>
+                  <span style={{ fontWeight: 700, color: "var(--blue)" }}>{d.sessions} sessions</span>
+                </div>
+                <div style={{ height: 8, borderRadius: 99, background: "#EEF1F8" }}>
+                  <div style={{ height: 8, borderRadius: 99, width: `${(d.sessions/maxSessions)*100}%`, background: (["var(--blue)","#1a4a9e","#2d5fce","#4674d4","#6089de"])[i] || "var(--blue)" }} />
+                </div>
+              </div>
+            ))}
+          </Card>
+
+          <Card style={{ padding: "24px" }}>
+            <div style={{ fontFamily: "Lora, serif", fontWeight: 700, fontSize: 16, color: "var(--text)", marginBottom: 16 }}>Online vs. In-Person</div>
+            <div style={{ display: "flex", justifyContent: "space-around", marginBottom: 16 }}>
+              <div style={{ textAlign: "center" }}>
+                <div style={{ fontFamily: "Lora, serif", fontWeight: 700, fontSize: 32, color: "var(--blue)" }}>{inPersonPct}%</div>
+                <div style={{ fontSize: 12, color: "var(--muted)", fontWeight: 500 }}>In-Person</div>
+                <div style={{ fontSize: 11, color: "var(--muted)" }}>{inPersonSessions} sessions</div>
+              </div>
+              <div style={{ width: 1, background: "#EEF1F8" }} />
+              <div style={{ textAlign: "center" }}>
+                <div style={{ fontFamily: "Lora, serif", fontWeight: 700, fontSize: 32, color: "#2D8CFF" }}>{onlinePct}%</div>
+                <div style={{ fontSize: 12, color: "var(--muted)", fontWeight: 500 }}>Online</div>
+                <div style={{ fontSize: 11, color: "var(--muted)" }}>{onlineSessions} sessions</div>
+              </div>
+            </div>
+            <div style={{ height: 10, borderRadius: 99, background: "#EEF1F8", overflow: "hidden", marginBottom: 16 }}>
+              <div style={{ display: "flex", height: "100%" }}>
+                <div style={{ width: `${inPersonPct}%`, background: "var(--blue)", borderRadius: "99px 0 0 99px" }} />
+                <div style={{ width: `${onlinePct}%`, background: "#2D8CFF", borderRadius: "0 99px 99px 0" }} />
+              </div>
+            </div>
+            <div style={{ fontSize: 12, fontWeight: 700, color: "var(--muted)", textTransform: "uppercase" as const, letterSpacing: "0.5px", marginBottom: 8 }}>Locations by Use</div>
+            {LOCATION_STATS.map((loc, i) => (
+              <div key={loc.name} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "6px 0", borderBottom: "1px solid #F5F6FA", fontSize: 12 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <span style={{ fontWeight: 700, color: "var(--muted)", fontSize: 11, width: 18 }}>#{i+1}</span>
+                  <span style={{ color: "var(--text)", fontWeight: 500 }}>{loc.name.includes("—") ? loc.name.split("—")[1].trim() : loc.name}</span>
+                </div>
+                <Badge label={`${loc.sessions}`} color={loc.mode === "Online" ? "blue" : "gray"} />
+              </div>
+            ))}
+          </Card>
+        </div>
+
+        {/* Tutor performance tables */}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20, marginBottom: 24 }}>
+          <Card style={{ padding: "24px" }}>
+            <div style={{ fontFamily: "Lora, serif", fontWeight: 700, fontSize: 16, color: "var(--text)", marginBottom: 16 }}>Most In-Demand Tutors</div>
+            {topByDemand.map((t, i) => (
+              <div key={t.id} style={{ display: "flex", gap: 12, alignItems: "center", padding: "10px 0", borderBottom: "1px solid #F5F6FA" }}>
+                <span style={{ fontFamily: "Lora, serif", fontWeight: 700, fontSize: 12, color: "var(--muted)", width: 18 }}>#{i+1}</span>
+                <Avatar initials={t.avatar} size={32} bg="var(--blue)" />
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text)" }}>{t.name}</div>
+                  <div style={{ fontSize: 11, color: "var(--muted)" }}>{t.subjects.slice(0,2).join(", ")}</div>
+                </div>
+                <Badge label={`${t.weeklySessionsUsed} / wk`} color={t.weeklySessionsUsed >= t.weeklySessionLimit ? "red" : "green"} />
+              </div>
+            ))}
+          </Card>
+
+          <Card style={{ padding: "24px" }}>
+            <div style={{ fontFamily: "Lora, serif", fontWeight: 700, fontSize: 16, color: "var(--text)", marginBottom: 16 }}>Highest Rated Tutors</div>
+            {topByRating.map((t, i) => (
+              <div key={t.id} style={{ display: "flex", gap: 12, alignItems: "center", padding: "10px 0", borderBottom: "1px solid #F5F6FA" }}>
+                <span style={{ fontFamily: "Lora, serif", fontWeight: 700, fontSize: 12, color: i === 0 ? "var(--gold)" : "var(--muted)", width: 18 }}>#{i+1}</span>
+                <Avatar initials={t.avatar} size={32} bg="var(--blue)" />
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text)" }}>{t.name}</div>
+                  <div style={{ fontSize: 11, color: "var(--muted)" }}>{t.reviews} reviews</div>
+                </div>
+                <span style={{ fontWeight: 700, color: "var(--gold)", fontSize: 15 }}>{t.rating}★</span>
+              </div>
+            ))}
+          </Card>
+        </div>
+
+        {/* Chatbot usage */}
+        <Card style={{ padding: "24px" }}>
+          <div style={{ fontFamily: "Lora, serif", fontWeight: 700, fontSize: 16, color: "var(--text)", marginBottom: 16 }}>Chatbot &amp; AI Usage</div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 14, marginBottom: 20 }}>
+            {[
+              { label:"Total Queries",       value: String(CHATBOT_STATS.totalQueries),         color:"var(--blue)"  },
+              { label:"Unique Students",     value: String(CHATBOT_STATS.uniqueStudents),        color:"var(--blue)"  },
+              { label:"Resolution Rate",     value:`${CHATBOT_STATS.resolutionRate}%`,           color:"#059669"      },
+              { label:"Avg Queries / User",  value: String(CHATBOT_STATS.avgQueriesPerUser),     color:"var(--gold)"  },
+            ].map(stat => (
+              <div key={stat.label} style={{ padding: "14px 16px", borderRadius: 12, background: "var(--bg)", textAlign: "center" }}>
+                <div style={{ fontFamily: "Lora, serif", fontWeight: 700, fontSize: 26, color: stat.color, lineHeight: 1 }}>{stat.value}</div>
+                <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 4, fontWeight: 500 }}>{stat.label}</div>
+              </div>
+            ))}
+          </div>
+          <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text)", marginBottom: 8 }}>Top Topics Students Ask</div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+            {CHATBOT_STATS.topTopics.map((topic, i) => (
+              <span key={topic} style={{ padding: "5px 12px", borderRadius: 99, fontSize: 12, fontWeight: 600, background: "var(--blue-light)", color: "var(--blue)" }}>
+                #{i+1} {topic}
+              </span>
+            ))}
+          </div>
+        </Card>
+
+        {/* Anonymous tutor feedback */}
+        <Card style={{ padding: "24px", marginTop: 24 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 6 }}>
+            <div style={{ fontFamily: "Lora, serif", fontWeight: 700, fontSize: 16, color: "var(--text)" }}>Anonymous Tutor Feedback Themes</div>
+            <Badge label="Anonymized" color="gray" />
+          </div>
+          <div style={{ fontSize: 13, color: "var(--muted)", marginBottom: 18 }}>Aggregated from student session ratings. No responses are linked to individual students.</div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            {ANONYMOUS_FEEDBACK.map(f => {
+              const maxCount = ANONYMOUS_FEEDBACK[0].count
+              const bg = f.sentiment === "positive" ? "#DCFCE7" : f.sentiment === "negative" ? "#FEE2E2" : "#FEF9C3"
+              const fg = f.sentiment === "positive" ? "#166534" : f.sentiment === "negative" ? "#991B1B" : "#92660A"
+              const bar = f.sentiment === "positive" ? "#22C55E" : f.sentiment === "negative" ? "#EF4444" : "var(--gold)"
+              return (
+                <div key={f.theme} style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                  <div style={{ width: 10, height: 10, borderRadius: "50%", background: bar, flexShrink: 0 }} />
+                  <div style={{ fontSize: 13, color: "var(--text)", fontWeight: 500, width: 260, flexShrink: 0 }}>{f.theme}</div>
+                  <div style={{ flex: 1, height: 8, borderRadius: 99, background: "#F5F6FA", overflow: "hidden" }}>
+                    <div style={{ height: 8, borderRadius: 99, width: `${(f.count / maxCount) * 100}%`, background: bar, transition: "width .4s" }} />
+                  </div>
+                  <div style={{ padding: "2px 8px", borderRadius: 6, fontSize: 11, fontWeight: 700, background: bg, color: fg, flexShrink: 0 }}>{f.count} mentions</div>
+                </div>
+              )
+            })}
+          </div>
+          <div style={{ marginTop: 16, padding: "10px 14px", borderRadius: 8, background: "var(--bg)", fontSize: 12, color: "var(--muted)" }}>
+            Feedback collected from post-session ratings. Themes extracted by Rooty AI — no student names, emails, or session IDs are stored with these results.
+          </div>
+        </Card>
+      </div>
+    )
+  }
+
+  // ── SETTINGS ─────────────────────────────────────────────
+  function SettingsScreen() {
+    const [vals, setVals] = useState({ ...LIMITS_CONFIG })
+    const [saved, setSaved] = useState(false)
+    function adj(key: keyof typeof LIMITS_CONFIG, delta: number, min: number, max: number) {
+      setVals(v => ({ ...v, [key]: Math.min(max, Math.max(min, v[key] + delta)) }))
+      setSaved(false)
+    }
+    function Counter({ label, sub, k, min, max }: { label: string; sub: string; k: keyof typeof LIMITS_CONFIG; min: number; max: number }) {
+      return (
+        <div style={{ padding: "16px 18px", borderRadius: 12, background: "var(--bg)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text)", marginBottom: 2 }}>{label}</div>
+            <div style={{ fontSize: 11, color: "var(--muted)" }}>{sub}</div>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <button onClick={() => adj(k, -1, min, max)} style={{ width: 32, height: 32, borderRadius: 8, border: "1.5px solid #E0E4EF", background: "white", cursor: "pointer", fontFamily: "DM Sans, sans-serif", fontWeight: 700, fontSize: 18, display: "flex", alignItems: "center", justifyContent: "center" }}>−</button>
+            <span style={{ fontFamily: "Lora, serif", fontWeight: 700, fontSize: 22, color: "var(--blue)", minWidth: 36, textAlign: "center" }}>{vals[k]}</span>
+            <button onClick={() => adj(k, +1, min, max)} style={{ width: 32, height: 32, borderRadius: 8, border: "1.5px solid #E0E4EF", background: "white", cursor: "pointer", fontFamily: "DM Sans, sans-serif", fontWeight: 700, fontSize: 18, display: "flex", alignItems: "center", justifyContent: "center" }}>+</button>
+          </div>
+        </div>
+      )
+    }
+    return (
+      <div style={{ flex: 1, overflowY: "auto", padding: "28px 32px" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 28 }}>
+          <div>
+            <h1 style={{ fontFamily: "Lora, serif", fontWeight: 700, fontSize: 26, color: "var(--text)", margin: 0 }}>Platform Settings</h1>
+            <div style={{ fontSize: 13, color: "var(--muted)", marginTop: 2 }}>Configure session limits, booking policies, and system parameters</div>
+          </div>
+          <Btn variant="primary" onClick={() => { setSaved(true); showToast("Settings saved ✓") }}>
+            Save Changes
+          </Btn>
+        </div>
+
+        {saved && (
+          <div style={{ padding: "10px 16px", borderRadius: 10, background: "#ECFDF5", border: "1.5px solid #6EE7B7", marginBottom: 20, fontSize: 13, color: "#065F46", fontWeight: 600 }}>
+            ✓ Settings saved successfully
+          </div>
+        )}
+
+        {/* Student limits */}
+        <Card style={{ padding: "22px", marginBottom: 20 }}>
+          <div style={{ fontFamily: "Lora, serif", fontWeight: 700, fontSize: 16, color: "var(--text)", marginBottom: 4 }}>Student Session Limits</div>
+          <div style={{ fontSize: 13, color: "var(--muted)", marginBottom: 16 }}>Control how many sessions students can book per week and per semester.</div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            <Counter label="Sessions per Week" sub="Max bookings a student can make in 7 days" k="studentSessionsPerWeek" min={1} max={7} />
+            <Counter label="Sessions per Semester" sub="Hard cap across the full semester" k="studentSessionsPerSemester" min={5} max={60} />
+          </div>
+        </Card>
+
+        {/* Tutor limits */}
+        <Card style={{ padding: "22px", marginBottom: 20 }}>
+          <div style={{ fontFamily: "Lora, serif", fontWeight: 700, fontSize: 16, color: "var(--text)", marginBottom: 4 }}>Tutor Capacity Limits</div>
+          <div style={{ fontSize: 13, color: "var(--muted)", marginBottom: 16 }}>Set maximum workloads to stay within budget and protect tutor availability.</div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            <Counter label="Sessions per Week (Tutor)" sub="Max sessions a single tutor can take per week" k="tutorSessionsPerWeek" min={1} max={15} />
+            <Counter label="Hours per Week (Tutor)" sub="Maximum billable hours per week" k="tutorHoursPerWeek" min={4} max={40} />
+            <Counter label="Hours per Semester (Tutor)" sub="Semester hour cap per tutor" k="tutorHoursPerSemester" min={20} max={400} />
+          </div>
+        </Card>
+
+        {/* Booking policy */}
+        <Card style={{ padding: "22px", marginBottom: 20 }}>
+          <div style={{ fontFamily: "Lora, serif", fontWeight: 700, fontSize: 16, color: "var(--text)", marginBottom: 4 }}>Booking & Cancellation Policy</div>
+          <div style={{ fontSize: 13, color: "var(--muted)", marginBottom: 16 }}>Control booking windows, session duration, and cancellation deadlines.</div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            <Counter label="Session Duration (min)" sub="Default length of a tutoring session" k="sessionDurationMinutes" min={30} max={120} />
+            <Counter label="Advance Booking Window (days)" sub="How many days ahead a student can book" k="advanceBookingDays" min={1} max={30} />
+            <Counter label="Cancellation Deadline (hours)" sub="Minimum notice required to cancel without penalty" k="cancellationHours" min={1} max={72} />
+          </div>
+        </Card>
+
+        {/* Alerts */}
+        <Card style={{ padding: "22px" }}>
+          <div style={{ fontFamily: "Lora, serif", fontWeight: 700, fontSize: 16, color: "var(--text)", marginBottom: 4 }}>Budget Alert Threshold</div>
+          <div style={{ fontSize: 13, color: "var(--muted)", marginBottom: 16 }}>Trigger a warning email when semester spend hits this percentage.</div>
+          <Counter label="Budget Alert at %" sub="Email the Director when this % of budget is spent" k="semesterBudgetAlert" min={50} max={95} />
+          <div style={{ marginTop: 12, padding: "10px 14px", borderRadius: 8, background: "var(--gold-light)", border: "1px solid var(--gold)", fontSize: 12, color: "#92660A" }}>
+            Currently set to alert at <strong>{vals.semesterBudgetAlert}%</strong> — an email will be sent to tutoring@ncf.edu when spend reaches ${Math.round(BUDGET_DATA.total * vals.semesterBudgetAlert / 100).toLocaleString()}.
+          </div>
+        </Card>
+      </div>
+    )
+  }
+
   const screens: Record<string, React.ReactNode> = {
-    dashboard: <DashboardScreen />,
-    approvals: <ApprovalsScreen />,
-    tutors:    <TutorsScreen />,
-    sessions:  <TutorsScreen />,
-    budget:    <BudgetScreen />,
-    hiring:    <HiringScreen />,
-    reports:   <ReportsScreen />,
-    privacy:   <PrivacyScreen />,
+    dashboard:      <DashboardScreen />,
+    approvals:      <ApprovalsScreen />,
+    tutors:         <TutorsScreen />,
+    sessions:       <TutorsScreen />,
+    accountability: <AccountabilityScreen />,
+    insights:       <InsightsScreen />,
+    budget:         <BudgetScreen />,
+    hiring:         <HiringScreen />,
+    reports:        <ReportsScreen />,
+    privacy:        <PrivacyScreen />,
+    settings:       <SettingsScreen />,
   }
 
   return (

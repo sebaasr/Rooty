@@ -1,11 +1,33 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
+html { scroll-behavior: smooth; }
+
 body {
-  font-family: 'DM Sans', sans-serif;
+  font-family: var(--font-dm-sans), 'DM Sans', sans-serif;
 }
 
 h1, h2, h3, h4 {
-  font-family: 'Lora', serif;
+  font-family: var(--font-lora), 'Lora', serif;
+}
+
+/* Keyboard focus — visible ring for all interactive elements */
+:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Hide focus ring for mouse/pointer users */
+:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* Respect reduced motion preference */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
 }
 
 ::-webkit-scrollbar { width: 6px; }

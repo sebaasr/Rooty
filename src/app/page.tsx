@@ -1,7 +1,7 @@
 "use client"
 
-import { useState } from "react"
-import { useRouter } from "next/navigation"
+import { useState, useEffect } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
 import { RootyWordmark } from "@/components/ui/BanyanLogo"
 import { Icon } from "@/components/ui/Icon"
 import { Btn } from "@/components/ui/index"
@@ -78,45 +78,39 @@ function BrandPanel() {
       background: "var(--blue)",
       display: "flex",
       flexDirection: "column",
-      padding: "48px 44px",
+      padding: "40px 44px",
       justifyContent: "space-between",
       flexShrink: 0,
+      position: "relative",
+      overflow: "hidden",
     }}>
       <div>
-        <RootyWordmark inverted />
-      </div>
-      <div>
-        <div style={{ marginBottom: 32 }}>
-          <svg width="200" height="180" viewBox="0 0 200 180" fill="none" style={{ display: "block", margin: "0 auto" }}>
-            <ellipse cx="100" cy="168" rx="70" ry="8" fill="rgba(255,255,255,0.08)" />
-            <rect x="91" y="110" width="18" height="58" rx="6" fill="rgba(255,255,255,0.25)" />
-            <ellipse cx="100" cy="80" rx="60" ry="48" fill="rgba(255,255,255,0.15)" />
-            <ellipse cx="100" cy="74" rx="52" ry="42" fill="rgba(255,255,255,0.12)" />
-            <ellipse cx="58" cy="88" rx="28" ry="22" fill="rgba(255,255,255,0.1)" />
-            <ellipse cx="142" cy="88" rx="28" ry="22" fill="rgba(255,255,255,0.1)" />
-            <path d="M62 115 Q52 135 58 165" stroke="rgba(255,255,255,0.3)" strokeWidth="3" strokeLinecap="round" fill="none" />
-            <path d="M138 115 Q148 135 142 165" stroke="rgba(255,255,255,0.3)" strokeWidth="3" strokeLinecap="round" fill="none" />
-            <path d="M76 120 Q70 145 74 165" stroke="rgba(255,255,255,0.2)" strokeWidth="2" strokeLinecap="round" fill="none" />
-            <path d="M124 120 Q130 145 126 165" stroke="rgba(255,255,255,0.2)" strokeWidth="2" strokeLinecap="round" fill="none" />
-            <circle cx="78" cy="55" r="5" fill="rgba(255,184,28,0.5)" />
-            <circle cx="120" cy="48" r="4" fill="rgba(255,184,28,0.4)" />
-            <circle cx="100" cy="38" r="6" fill="rgba(255,184,28,0.45)" />
-            <circle cx="60" cy="72" r="4" fill="rgba(255,184,28,0.3)" />
-            <circle cx="140" cy="68" r="5" fill="rgba(255,184,28,0.35)" />
-          </svg>
+        {/* Logo in a white pill so navy is visible on blue background */}
+        <div style={{ display: "inline-flex", background: "rgba(255,255,255,0.92)", borderRadius: 8, padding: "6px 12px" }}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/assets/ncf-logo-horiz.png" alt="New College of Florida"
+            style={{ height: 30, objectFit: "contain" }} />
         </div>
-        <div style={{ fontFamily: "Lora, serif", fontWeight: 700, fontSize: 26, color: "white", lineHeight: 1.3, marginBottom: 12 }}>
+      </div>
+
+      <div style={{ textAlign: "center" }}>
+        {/* mix-blend-mode:screen makes the black background transparent on dark backgrounds */}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/assets/mascot.png" alt="NCF Banyan Mascot"
+          style={{ width: 220, objectFit: "contain", display: "block", margin: "0 auto 24px", mixBlendMode: "screen" }} />
+        <div style={{ fontFamily: "Lora, serif", fontWeight: 700, fontSize: 26, color: "white", lineHeight: 1.3, marginBottom: 10 }}>
           Peer tutoring,<br />built for NCF.
         </div>
         <p style={{ fontSize: 14, color: "rgba(255,255,255,0.65)", lineHeight: 1.7, margin: 0 }}>
           Connect with student tutors, book sessions, and track your academic progress — all in one place.
         </p>
       </div>
-      <div style={{ display: "flex", gap: 16 }}>
-        {["24 tutors", "12 subjects", "186 sessions this semester"].map(s => (
-          <div key={s} style={{ fontSize: 11, color: "rgba(255,255,255,0.5)", fontWeight: 500 }}>
-            <span style={{ display: "block", width: 20, height: 1, background: "rgba(255,255,255,0.3)", marginBottom: 4 }} />
-            {s}
+
+      <div style={{ display: "flex", gap: 0, borderTop: "1px solid rgba(255,255,255,0.15)", paddingTop: 20 }}>
+        {[["24", "tutors"], ["12", "subjects"], ["186", "sessions"]].map(([num, label], i) => (
+          <div key={label} style={{ flex: 1, textAlign: "center", borderRight: i < 2 ? "1px solid rgba(255,255,255,0.12)" : "none" }}>
+            <div style={{ fontFamily: "Lora, serif", fontWeight: 700, fontSize: 22, color: "var(--gold)" }}>{num}</div>
+            <div style={{ fontSize: 11, color: "rgba(255,255,255,0.5)", marginTop: 2, fontWeight: 500 }}>{label}</div>
           </div>
         ))}
       </div>
@@ -124,9 +118,23 @@ function BrandPanel() {
   )
 }
 
+import { Suspense } from "react"
 export default function AuthPage() {
+  return (
+    <Suspense fallback={<div style={{ height: "100vh", background: "var(--blue)" }} />}>
+      <AuthPageInner />
+    </Suspense>
+  )
+}
+
+function AuthPageInner() {
   const router = useRouter()
+  const params = useSearchParams()
   const [view, setView] = useState<View>("signin")
+
+  useEffect(() => {
+    if (params.get("view") === "register") setView("register")
+  }, [params])
   const [form, setForm] = useState<FormState>({ name: "", email: "", password: "", role: "student", subjects: [] })
   const [errors, setErrors] = useState<Errors>({})
   const [loading, setLoading] = useState(false)
@@ -199,10 +207,8 @@ export default function AuthPage() {
               display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
               transition: "all .15s", boxShadow: "0 1px 3px rgba(0,0,0,0.06)",
             }}>
-              <svg width="20" height="20" viewBox="0 0 40 40">
-                <circle cx="20" cy="20" r="18" fill="var(--blue)" />
-                <text x="20" y="27" textAnchor="middle" fill="white" fontSize="16" fontWeight="bold" fontFamily="serif">N</text>
-              </svg>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/assets/ncf-shield.png" alt="NCF" style={{ height: 22, width: 22, objectFit: "contain", borderRadius: 3 }} />
               Continue with NCF SSO
             </button>
 
@@ -235,6 +241,25 @@ export default function AuthPage() {
                 style={{ color: "var(--blue)", fontWeight: 600, background: "none", border: "none", cursor: "pointer", fontSize: 13 }}>
                 Create one
               </button>
+            </div>
+
+            <div style={{ marginTop: 24, paddingTop: 20, borderTop: "1px solid #E0E4EF", textAlign: "center" }}>
+              <div style={{ fontSize: 11, color: "var(--muted)", marginBottom: 10, fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.5px" }}>Demo Access</div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                {[
+                  { label: "Student View",  href: "/dashboard?role=student" },
+                  { label: "Tutor View",    href: "/dashboard?role=tutor"   },
+                  { label: "Director View", href: "/dashboard?role=admin"   },
+                  { label: "Provost View",  href: "/dashboard?role=provost" },
+                ].map(({ label, href }) => (
+                  <a key={href} href={href} style={{
+                    display: "block", padding: "9px 12px", borderRadius: 8, border: "1.5px solid #E0E4EF",
+                    background: "var(--bg)", cursor: "pointer", textDecoration: "none",
+                    fontFamily: "DM Sans, sans-serif", fontWeight: 600, fontSize: 12, color: "var(--text)",
+                    textAlign: "center",
+                  }}>{label}</a>
+                ))}
+              </div>
             </div>
           </form>
         )}

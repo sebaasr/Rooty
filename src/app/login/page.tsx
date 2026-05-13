@@ -4,7 +4,7 @@ import { useState } from "react"
 import Link from "next/link"
 import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
-import { BanyanLogo } from "@/components/ui/BanyanLogo"
+import { BanyanLogoColor } from "@/components/ui/BanyanLogo"
 
 export default function LoginPage() {
   const router = useRouter()
@@ -30,9 +30,9 @@ export default function LoginPage() {
 
         {/* Logo */}
         <div style={{ textAlign: "center", marginBottom: 32 }}>
-          <Link href="/" style={{ display: "inline-flex", flexDirection: "column", alignItems: "center", gap: 8, textDecoration: "none" }}>
-            <BanyanLogo size={48} color="var(--blue)" />
-            <span style={{ fontFamily: "Lora, serif", fontWeight: 700, fontSize: 24, color: "var(--blue)", letterSpacing: "-0.5px" }}>rooty</span>
+          <Link href="/" style={{ display: "inline-flex", flexDirection: "column", alignItems: "center", gap: 10, textDecoration: "none" }}>
+            <BanyanLogoColor size={52} />
+            <span style={{ fontFamily: "var(--font-lora), Lora, serif", fontWeight: 700, fontSize: 24, color: "var(--blue)", letterSpacing: "-0.5px" }}>rooty</span>
           </Link>
           <p style={{ fontFamily: "DM Sans, sans-serif", fontSize: 13, color: "var(--muted)", marginTop: 4 }}>New College of Florida</p>
         </div>

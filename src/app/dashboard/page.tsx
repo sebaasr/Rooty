@@ -1,8 +1,10 @@
 "use client"
 
-import { useState } from "react"
+import { useState, Suspense } from "react"
+import { useSearchParams } from "next/navigation"
 import dynamic from "next/dynamic"
 import Chatbot from "@/components/ui/Chatbot"
+import AiTutor from "@/components/ui/AiTutor"
 
 const StudentDashboard = dynamic(() => import("@/components/dashboard/StudentDashboard"), { ssr: false })
 const TutorDashboard   = dynamic(() => import("@/components/dashboard/TutorDashboard"),   { ssr: false })
@@ -18,8 +20,12 @@ const ROLES: { key: Role; label: string; icon: string }[] = [
   { key: "provost", label: "Provost's Office", icon: "📊" },
 ]
 
-export default function DashboardPage() {
-  const [role, setRole] = useState<Role>("student")
+function DashboardContent() {
+  const params = useSearchParams()
+  const initialRole = (params.get("role") as Role | null) ?? "student"
+  const [role, setRole] = useState<Role>(
+    ROLES.some(r => r.key === initialRole) ? initialRole : "student"
+  )
 
   const apps: Record<Role, React.ReactNode> = {
     student: <StudentDashboard />,
@@ -42,7 +48,6 @@ export default function DashboardPage() {
         zIndex: 50,
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: 24 }}>
-          {/* Wordmark */}
           <div style={{ fontFamily: "Lora, serif", fontWeight: 700, fontSize: 17, color: "#fff", display: "flex", alignItems: "center", gap: 8, letterSpacing: "-0.3px" }}>
             <svg width="20" height="20" viewBox="0 0 40 40" fill="none">
               <rect x="18" y="24" width="4" height="12" rx="2" fill="white"/>
@@ -53,7 +58,6 @@ export default function DashboardPage() {
             </svg>
             rooty
           </div>
-          {/* Role buttons */}
           <div style={{ display: "flex", gap: 6 }}>
             {ROLES.map(r => (
               <button key={r.key} onClick={() => setRole(r.key)} style={{
@@ -81,13 +85,20 @@ export default function DashboardPage() {
         </span>
       </div>
 
-      {/* Dashboard frame */}
       <div style={{ flex: 1, overflow: "hidden", background: "var(--bg)" }}>
         {apps[role]}
       </div>
 
-      {/* Global chatbot — available on all role views */}
       <Chatbot />
+      <AiTutor />
     </div>
+  )
+}
+
+export default function DashboardPage() {
+  return (
+    <Suspense fallback={<div style={{ height: "100vh", background: "#0a0f1e" }} />}>
+      <DashboardContent />
+    </Suspense>
   )
 }
